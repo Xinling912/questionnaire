@@ -6,6 +6,8 @@ const END_TRIGGERS = new Set([
   "A9_never",
 ]);
 
+const SUBMISSION_ENDPOINT = "";
+
 const screens = [
   {
     id: "welcome",
@@ -15,6 +17,52 @@ const screens = [
     body:
       "Please complete each page before continuing. Once you continue, you cannot return to previous pages.",
     bodyCn: "请完成当前页面后继续。进入下一页后不可返回上一页。",
+  },
+  {
+    id: "consent",
+    type: "consent",
+    topLabel: "Consent Form / 知情同意说明",
+    title: "Consent Form",
+    titleCn: "知情同意说明",
+    paragraphs: [
+      [
+        "Before participating in this questionnaire, please read the following information and confirm your consent.",
+        "在参与本问卷之前，请您阅读以下说明并确认您的同意。",
+      ],
+      [
+        "This study aims to understand students' experience and perceptions of using AI tools for programming learning. The questionnaire will take approximately 10-15 minutes.",
+        "本研究旨在了解学生使用 AI 工具进行编程学习的体验与看法。问卷填写大约需要 10-15 分钟。",
+      ],
+      [
+        "All responses will be used for academic research only and will be processed anonymously. Your personal identity will not be disclosed.",
+        "所有回答仅用于学术研究，并将以匿名形式进行处理，不会泄露您的个人身份信息。",
+      ],
+      [
+        "Your participation is completely voluntary. You may stop answering at any time without any negative consequences.",
+        "您的参与完全自愿，您可以在任何时候停止作答，而不会产生任何不利影响。",
+      ],
+      [
+        "If you agree to participate in this study, please tick all boxes below.",
+        "如果您同意参与本研究，请勾选下方所有选项。",
+      ],
+    ],
+    confirmations: [
+      [
+        "read_understood",
+        "I have read and understood the study information and agree to participate in this questionnaire.",
+        "我已阅读并理解本研究说明，并同意参与本问卷。",
+      ],
+      [
+        "research_use",
+        "I understand that my responses will be used for academic research only and will be anonymized.",
+        "我知晓我的回答将仅用于学术研究，并会以匿名形式处理。",
+      ],
+      [
+        "voluntary",
+        "I understand that I can stop answering at any time without any consequences.",
+        "我了解我可以在任何时候停止作答，而无需承担任何后果。",
+      ],
+    ],
   },
   {
     id: "A1",
@@ -283,6 +331,8 @@ const state = {
   answers: {},
   endedEarly: false,
   endReason: "",
+  submissionStatus: "idle",
+  submissionError: "",
 };
 
 const screenEl = document.querySelector("#screen");
@@ -298,10 +348,12 @@ function render() {
   stepLabel.textContent = current.topLabel || "Questionnaire";
   progressLabel.textContent = `${Math.min(state.index + 1, screens.length)}/${screens.length}`;
   validationMessage.textContent = "";
+  nextButton.hidden = current.type === "submit";
   nextButton.disabled = !isComplete(current);
-  nextButton.textContent = current.type === "submit" ? "Download JSON" : "Continue";
+  nextButton.textContent = current.type === "consent" ? "Agree and Continue" : "Continue";
 
   if (current.type === "welcome") renderWelcome(current);
+  if (current.type === "consent") renderConsent(current);
   if (current.type === "choice") renderChoice(current);
   if (current.type === "likert") renderLikert(current);
   if (current.type === "text") renderText(current);
@@ -313,6 +365,51 @@ function renderWelcome(screen) {
     <h1>${screen.title}<span class="cn-title">${screen.titleCn}</span></h1>
     <p class="intro">${screen.body}<br>${screen.bodyCn}</p>
   `;
+}
+
+function renderConsent(screen) {
+  const selected = getAnswer(screen.id)?.value || [];
+  screenEl.innerHTML = `
+    <div class="consent-copy">
+      <h2>${screen.title}<span class="cn-title">${screen.titleCn}</span></h2>
+      ${screen.paragraphs
+        .map(
+          ([en, cn]) => `
+            <p>
+              <span>${en}</span>
+              <span>${cn}</span>
+            </p>
+          `
+        )
+        .join("")}
+    </div>
+    <div class="options consent-options">
+      ${screen.confirmations
+        .map(([value, en, cn]) => {
+          const checked = selected.includes(value) ? "checked" : "";
+          return `
+            <label class="option">
+              <input type="checkbox" name="${screen.id}" value="${value}" ${checked}>
+              <span class="option-text">
+                <span class="en">${en}</span>
+                <span class="cn">${cn}</span>
+              </span>
+            </label>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+
+  screenEl.querySelectorAll(`input[name="${screen.id}"]`).forEach((input) => {
+    input.addEventListener("change", () => {
+      const value = [...screenEl.querySelectorAll(`input[name="${screen.id}"]:checked`)].map(
+        (item) => item.value
+      );
+      state.answers[screen.id] = { value };
+      nextButton.disabled = !isComplete(screen);
+    });
+  });
 }
 
 function renderChoice(screen) {
@@ -481,20 +578,39 @@ function renderText(screen) {
 }
 
 function renderSubmit() {
+  const payload = buildSubmissionPayload();
+  localStorage.setItem("questionnaireResponses", JSON.stringify(payload));
+  if (state.submissionStatus === "idle") {
+    if (!SUBMISSION_ENDPOINT) {
+      state.submissionStatus = "not_configured";
+    } else {
+      state.submissionStatus = "pending";
+      submitResponses(payload)
+        .then(() => {
+          state.submissionStatus = "success";
+          render();
+        })
+        .catch((error) => {
+          state.submissionStatus = "error";
+          state.submissionError = error.message || "Submission failed";
+          render();
+        });
+    }
+  }
+
   const early = state.endedEarly
     ? `<p><strong>Questionnaire ended early.</strong><br>结束原因：${state.endReason}</p>`
     : "<p><strong>All pages are complete.</strong><br>所有页面均已完成。</p>";
+  const submitStatus = getSubmissionStatusMessage();
 
   screenEl.innerHTML = `
     <p class="kicker">Submission</p>
     <h2>Thank you<span class="cn-title">感谢你的填写</span></h2>
     <div class="status">
       ${early}
-      <p>This prototype stores answers in the browser and can download a JSON file. When the backend is selected, the same data object can be sent to an API.</p>
-      <p>当前原型会把答案暂存在浏览器中，并可下载 JSON 文件。后续确定后端后，同一份数据可以提交到 API。</p>
+      ${submitStatus}
     </div>
   `;
-  nextButton.disabled = false;
 }
 
 function handleNext() {
@@ -502,11 +618,6 @@ function handleNext() {
 
   if (!isComplete(current)) {
     validationMessage.textContent = "Please complete this page before continuing. / 请先完成当前页面。";
-    return;
-  }
-
-  if (current.type === "submit") {
-    downloadResponses();
     return;
   }
 
@@ -530,6 +641,9 @@ function getAnswer(id) {
 function isComplete(screen) {
   if (screen.type === "welcome" || screen.type === "submit") return true;
   const answer = getAnswer(screen.id);
+  if (screen.type === "consent") {
+    return screen.confirmations.every(([value]) => answer?.value?.includes(value));
+  }
   if (screen.type === "choice") {
     if (!answer || answer.value.length === 0) return false;
     const selectedOther = screen.options.filter((option) => option[3]).map((option) => option[0]);
@@ -551,21 +665,48 @@ function getEndTrigger(screen) {
   return selected.find((value) => END_TRIGGERS.has(value)) || "";
 }
 
-function downloadResponses() {
-  const payload = {
+function buildSubmissionPayload() {
+  return {
     submittedAt: new Date().toISOString(),
     endedEarly: state.endedEarly,
     endReason: state.endReason,
     answers: state.answers,
   };
-  localStorage.setItem("questionnaireResponses", JSON.stringify(payload));
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `questionnaire-${Date.now()}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
+}
+
+function submitResponses(payload) {
+  return fetch(SUBMISSION_ENDPOINT, {
+    method: "POST",
+    mode: "no-cors",
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+function getSubmissionStatusMessage() {
+  if (state.submissionStatus === "pending") {
+    return `
+      <p><strong>Submitting response...</strong><br>正在提交问卷数据，请不要关闭页面。</p>
+    `;
+  }
+  if (state.submissionStatus === "success") {
+    return `
+      <p><strong>Response submitted.</strong><br>问卷数据已提交。</p>
+    `;
+  }
+  if (state.submissionStatus === "error") {
+    return `
+      <p><strong>Response could not be submitted.</strong><br>问卷数据提交失败：${escapeHtml(state.submissionError)}</p>
+      <p>Please contact the researcher. / 请联系研究人员。</p>
+    `;
+  }
+  return `
+    <p><strong>Response completed.</strong><br>问卷已完成。</p>
+    <p>The storage backend is not connected yet. After the Google Apps Script URL is added, this page will submit responses automatically.</p>
+    <p>当前还没有接入数据保存后端。填入 Google Apps Script URL 后，本页面会自动提交问卷数据。</p>
+  `;
 }
 
 function escapeAttr(value) {
@@ -574,6 +715,10 @@ function escapeAttr(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
+}
+
+function escapeHtml(value) {
+  return escapeAttr(value);
 }
 
 function formatEndpointLabel(label, className = "endpoint-label") {

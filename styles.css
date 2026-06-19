@@ -103,6 +103,33 @@ h2 {
   line-height: 1.65;
 }
 
+.consent-copy {
+  max-width: 980px;
+}
+
+.consent-copy h2 {
+  margin-bottom: 20px;
+}
+
+.consent-copy p {
+  margin: 0 0 18px;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.consent-copy p span {
+  display: block;
+}
+
+.consent-copy p span + span {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.consent-options {
+  margin-top: 24px;
+}
+
 .question-title {
   max-width: 950px;
   margin: 20px 0 28px;

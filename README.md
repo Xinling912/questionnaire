@@ -19,12 +19,15 @@ Open `index.html` directly in a browser, or serve this folder with any static se
 
 ## Backend Collection Options
 
-Recommended choices:
+Recommended choice for this project:
 
 1. Google Sheets via Apps Script
-   - Best for pilot studies and small sample sizes.
-   - Easy to inspect and export responses.
-   - Needs a simple Apps Script endpoint and CORS-safe submission.
+   - The browser submits JSON.
+   - Apps Script receives the JSON and writes one row into Google Sheet.
+   - Google Sheet can be exported as CSV for analysis.
+   - Setup instructions are in `google-apps-script/SETUP.md`.
+
+Other choices:
 
 2. Supabase
    - Best if you want a real database without much server setup.
@@ -53,4 +56,3 @@ Recommended choices:
 3. University server
    - Best if ethics/data governance requires institutional hosting.
    - Usually needs coordination with IT.
-
