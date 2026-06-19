@@ -6,7 +6,7 @@ const END_TRIGGERS = new Set([
   "A9_never",
 ]);
 
-const SUBMISSION_ENDPOINT = "";
+const SUBMISSION_ENDPOINT = "https://script.google.com/macros/s/AKfycbyBV11QgUCLWcDNCskMp6jEuD-oFq-ui4AfLhJje78ATVfznbg6oonnLksFpknqxBV5/exec";
 
 const screens = [
   {
