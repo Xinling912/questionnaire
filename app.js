@@ -19,7 +19,7 @@ const screens = [
   {
     id: "A1",
     type: "choice",
-    section: "Demographic Information / 人口统计信息",
+    topLabel: "Demographic Information / 人口统计信息",
     en: "A1. Your gender",
     cn: "你的性别：",
     required: true,
@@ -34,6 +34,7 @@ const screens = [
   {
     id: "A2",
     type: "choice",
+    topLabel: "Demographic Information / 人口统计信息",
     en: "A2. Your age range",
     cn: "你的年龄段：",
     required: true,
@@ -50,7 +51,7 @@ const screens = [
   {
     id: "A3",
     type: "choice",
-    section: "Background Information / 背景信息",
+    topLabel: "Background Information / 背景信息",
     en: "A3. Your major category",
     cn: "你的专业类别：",
     required: true,
@@ -65,6 +66,7 @@ const screens = [
   {
     id: "A4",
     type: "choice",
+    topLabel: "Background Information / 背景信息",
     en: "A4. Have you taken or are you currently taking any programming-related courses?",
     cn: "你是否正在修读或曾经修读过编程相关课程？",
     required: true,
@@ -78,6 +80,7 @@ const screens = [
   {
     id: "A5",
     type: "choice",
+    topLabel: "Background Information / 背景信息",
     en: "A5. Which programming languages do you know? (Select all that apply)",
     cn: "你了解或使用过哪些编程语言？（可多选）",
     required: true,
@@ -99,6 +102,7 @@ const screens = [
   {
     id: "A6",
     type: "choice",
+    topLabel: "Background Information / 背景信息",
     en: "A6. What is your current year of study?",
     cn: "你目前的年级是？",
     required: true,
@@ -113,6 +117,7 @@ const screens = [
   {
     id: "A7",
     type: "choice",
+    topLabel: "Background Information / 背景信息",
     en: "A7. Which AI tools have you used for programming? (Select all that apply)",
     cn: "你使用过哪些 AI 工具辅助编程？（可多选）",
     required: true,
@@ -136,22 +141,24 @@ const screens = [
   {
     id: "A8",
     type: "choice",
+    topLabel: "Background Information / 背景信息",
     en: "A8. How long have you been using AI tools for programming?",
     cn: "你使用 AI 工具辅助编程有多长时间了？",
     required: true,
     multiple: false,
     options: [
-      ["A8_never", "Never used", "从未使用"],
       ["lt_1_month", "Less than 1 month", "不到 1 个月"],
       ["1_3_months", "1-3 months", "1-3 个月"],
       ["3_6_months", "3-6 months", "3-6 个月"],
       ["6_12_months", "6-12 months", "6-12 个月"],
       ["gt_1_year", "More than 1 year", "超过 1 年"],
+      ["A8_never", "Never used", "从未使用"],
     ],
   },
   {
     id: "A9",
     type: "choice",
+    topLabel: "Background Information / 背景信息",
     en: "A9. How frequently do you use AI tools for programming?",
     cn: "你多久使用一次 AI 工具进行编程？",
     required: true,
@@ -169,6 +176,7 @@ const screens = [
   {
     id: "B",
     type: "likert",
+    topLabel: "Programming Assignment Experience / 编程作业经历",
     title: "Instructions: Please answer based on your actual experience with programming assignments.",
     titleCn: "说明：请根据你在编程作业中的真实经历回答。",
     leftLabel: "Strongly Disagree / 非常不同意",
@@ -185,55 +193,59 @@ const screens = [
     ],
   },
   {
-    id: "Q3_1",
+    id: "C1",
     type: "likert",
-    title: "Q3.1 Perceived Usefulness for Programming Learning",
+    topLabel: "AI Tools for Programming Learning / AI 编程学习",
+    title: "C1. Perceived Usefulness for Programming Learning",
     titleCn: "编程学习有用性感知",
     leftLabel: "Strongly Disagree / 非常不同意",
     rightLabel: "Strongly Agree / 非常同意",
     explain: ["Please explain the reasons for your ratings above:", "请解释你上述评分的理由："],
     items: [
-      ["Q3.1.1", "AI tools help me to learn programming more efficiently.", "AI tools 帮助我更高效地学习编程。"],
-      ["Q3.1.2", "AI tools improve my programming performance.", "AI tools 提高了我的编程表现。"],
-      ["Q3.1.3", "AI tools make my learning more effective.", "AI tools 让我的学习更有效。"],
-      ["Q3.1.4", "AI tools make it easier to learn programming.", "AI tools 让学习编程变得更容易。"],
-      ["Q3.1.5", "Overall, AI tools are advantageous for my programming learning.", "总体而言，AI tools 对我的编程学习是有益的。"],
+      ["C1.1", "AI tools help me to learn programming more efficiently.", "AI tools 帮助我更高效地学习编程。"],
+      ["C1.2", "AI tools improve my programming performance.", "AI tools 提高了我的编程表现。"],
+      ["C1.3", "AI tools make my learning more effective.", "AI tools 让我的学习更有效。"],
+      ["C1.4", "AI tools make it easier to learn programming.", "AI tools 让学习编程变得更容易。"],
+      ["C1.5", "Overall, AI tools are advantageous for my programming learning.", "总体而言，AI tools 对我的编程学习是有益的。"],
     ],
   },
   {
-    id: "Q3_2",
+    id: "C2",
     type: "likert",
-    title: "Q3.2 Perceived Cost / Responsible AI Risk",
+    topLabel: "AI Tools for Programming Learning / AI 编程学习",
+    title: "C2. Perceived Cost / Responsible AI Risk",
     titleCn: "感知成本与负责任 AI 风险",
     leftLabel: "Strongly Disagree / 非常不同意",
     rightLabel: "Strongly Agree / 非常同意",
     explain: ["Please explain the reasons for your ratings above:", "请解释你上述评分的理由："],
     items: [
-      ["Q3.2.1", "Using generative AI technologies such as AI tools to complete assignments undermines the value of a university education.", "使用 AI tools 等生成式 AI 技术完成作业会削弱大学教育的价值。"],
-      ["Q3.2.2", "Generative AI technologies such as AI tools will limit my opportunities to interact with others and socialize while completing coursework.", "在完成课程任务时，AI tools 等生成式 AI 技术会限制我与他人互动和社交的机会。"],
-      ["Q3.2.3", "Generative AI technologies such as AI tools will hinder my development of generic or transferable skills such as teamwork, problem-solving, and leadership skills.", "AI tools 等生成式 AI 技术会阻碍我发展团队合作、问题解决和领导力等通用或可迁移技能。"],
-      ["Q3.2.4", "I can become over-reliant on generative AI technologies.", "我可能会过度依赖生成式 AI 技术。"],
+      ["C2.1", "Using generative AI technologies such as AI tools to complete assignments undermines the value of a university education.", "使用 AI tools 等生成式 AI 技术完成作业会削弱大学教育的价值。"],
+      ["C2.2", "Generative AI technologies such as AI tools will limit my opportunities to interact with others and socialize while completing coursework.", "在完成课程任务时，AI tools 等生成式 AI 技术会限制我与他人互动和社交的机会。"],
+      ["C2.3", "Generative AI technologies such as AI tools will hinder my development of generic or transferable skills such as teamwork, problem-solving, and leadership skills.", "AI tools 等生成式 AI 技术会阻碍我发展团队合作、问题解决和领导力等通用或可迁移技能。"],
+      ["C2.4", "I can become over-reliant on generative AI technologies.", "我可能会过度依赖生成式 AI 技术。"],
     ],
   },
   {
-    id: "Q3_3",
+    id: "C3",
     type: "likert",
-    title: "Q3.3 Programming Learning Acceptance",
+    topLabel: "AI Tools for Programming Learning / AI 编程学习",
+    title: "C3. Programming Learning Acceptance",
     titleCn: "编程学习接受度",
     leftLabel: "Strongly Disagree / 非常不同意",
     rightLabel: "Strongly Agree / 非常同意",
     explain: ["Please explain the reasons for your ratings above:", "请解释你上述评分的理由："],
     items: [
-      ["Q3.3.1", "Are AI tools helpful for learning programming?", "AI tools 对学习编程有帮助吗？"],
-      ["Q3.3.2", "Will you keep using AI tools for learning programming?", "你会继续使用 AI tools 学习编程吗？"],
-      ["Q3.3.3", "Will you use AI tools often?", "你会经常使用 AI tools 吗？"],
-      ["Q3.3.4", "Will you recommend AI tools to friends?", "你会向朋友推荐 AI tools 吗？"],
+      ["C3.1", "Are AI tools helpful for learning programming?", "AI tools 对学习编程有帮助吗？"],
+      ["C3.2", "Will you keep using AI tools for learning programming?", "你会继续使用 AI tools 学习编程吗？"],
+      ["C3.3", "Will you use AI tools often?", "你会经常使用 AI tools 吗？"],
+      ["C3.4", "Will you recommend AI tools to friends?", "你会向朋友推荐 AI tools 吗？"],
     ],
   },
   {
-    id: "Q3_4",
+    id: "C4",
     type: "likert",
-    title: "Q3.4 How and to what extent do you think AI tools can help with your programming learning?",
+    topLabel: "AI Tools for Programming Learning / AI 编程学习",
+    title: "C4. How and to what extent do you think AI tools can help with your programming learning?",
     titleCn: "你认为 AI 工具在多大程度上能帮助你学习编程？",
     leftLabel: "Not useful at all",
     rightLabel: "Extremely useful",
@@ -242,17 +254,18 @@ const screens = [
       "请解释你上述评分的理由（例如，为什么你认为某个功能特别有用或没有用）：",
     ],
     items: [
-      ["correct_code", "Correct programming code", "纠正编程代码"],
-      ["answer_questions", "Answer programming questions", "回答编程问题"],
-      ["provide_examples", "Provide examples of programming code", "提供编程代码示例"],
-      ["learning_advice", "Offer learning advice and resources", "提供学习建议和资源"],
-      ["explain_concepts", "Explain programming concepts", "解释编程概念"],
+      ["C4.1", "Correct programming code", "纠正编程代码"],
+      ["C4.2", "Answer programming questions", "回答编程问题"],
+      ["C4.3", "Provide examples of programming code", "提供编程代码示例"],
+      ["C4.4", "Offer learning advice and resources", "提供学习建议和资源"],
+      ["C4.5", "Explain programming concepts", "解释编程概念"],
     ],
   },
   {
-    id: "Q3_5",
+    id: "C5",
     type: "text",
-    title: "Q3.5 Open-Ended Questions",
+    topLabel: "AI Tools for Programming Learning / AI 编程学习",
+    title: "C5. Open-Ended Questions",
     titleCn: "开放题",
     en: "How could AI tools be improved to better assist with programming learning?",
     cn: "AI tools 应如何改进，才能更好地辅助编程学习？",
@@ -261,6 +274,7 @@ const screens = [
   {
     id: "submit",
     type: "submit",
+    topLabel: "Submission / 提交",
   },
 ];
 
@@ -281,7 +295,7 @@ nextButton.addEventListener("click", handleNext);
 
 function render() {
   const current = screens[state.index];
-  stepLabel.textContent = current.section || current.id || "Questionnaire";
+  stepLabel.textContent = current.topLabel || "Questionnaire";
   progressLabel.textContent = `${Math.min(state.index + 1, screens.length)}/${screens.length}`;
   validationMessage.textContent = "";
   nextButton.disabled = !isComplete(current);
@@ -296,7 +310,6 @@ function render() {
 
 function renderWelcome(screen) {
   screenEl.innerHTML = `
-    <p class="kicker">Draft Questionnaire</p>
     <h1>${screen.title}<span class="cn-title">${screen.titleCn}</span></h1>
     <p class="intro">${screen.body}<br>${screen.bodyCn}</p>
   `;
@@ -306,7 +319,6 @@ function renderChoice(screen) {
   const inputType = screen.multiple ? "checkbox" : "radio";
   const selected = getAnswer(screen.id)?.value || [];
   screenEl.innerHTML = `
-    ${screen.section ? `<p class="kicker">${screen.section}</p>` : ""}
     <div class="question-title">
       <span class="en">${screen.en}</span>
       <span class="cn">${screen.cn}</span>
@@ -397,14 +409,19 @@ function renderLikert(screen) {
                   <td class="item-code">${code}</td>
                   <td class="prompt"><span class="en">${en}</span><span class="cn">${cn}</span></td>
                   <td class="scale" data-code="${code}">
-                    <div class="scale-labels"><span>${screen.leftLabel}</span><span>${screen.rightLabel}</span></div>
-                    <div class="scale-buttons">
-                      ${[1, 2, 3, 4, 5]
-                        .map(
-                          (score) =>
-                            `<button type="button" data-score="${score}" class="${answer.values[code] === score ? "selected" : ""}">${score}</button>`
-                        )
-                        .join("")}
+                    <div class="scale-row">
+                      ${formatEndpointLabel(screen.leftLabel, "scale-end left")}
+                      <div class="scale-buttons">
+                        ${[1, 2, 3, 4, 5]
+                          .map(
+                            (score) =>
+                              `<button type="button" data-score="${score}" class="${answer.values[code] === score ? "selected" : ""}">
+                                <span class="score-number">${score}</span>
+                              </button>`
+                          )
+                          .join("")}
+                      </div>
+                      ${formatEndpointLabel(screen.rightLabel, "scale-end right")}
                     </div>
                   </td>
                 </tr>
@@ -557,6 +574,16 @@ function escapeAttr(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
+}
+
+function formatEndpointLabel(label, className = "endpoint-label") {
+  const [en, cn] = String(label).split(" / ");
+  return `
+    <span class="${className}">
+      <span>${en || ""}</span>
+      ${cn ? `<span>${cn}</span>` : ""}
+    </span>
+  `;
 }
 
 render();
