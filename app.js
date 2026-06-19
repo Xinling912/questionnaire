@@ -6,7 +6,7 @@ const END_TRIGGERS = new Set([
   "A9_never",
 ]);
 
-const SUBMISSION_ENDPOINT = "https://script.google.com/macros/s/AKfycbyBV11QgUCLWcDNCskMp6jEuD-oFq-ui4AfLhJje78ATVfznbg6oonnLksFpknqxBV5/exec";
+const SUBMISSION_ENDPOINT = "https://questionnaire-d7gkuzy61a43c1a64-1445197007.ap-shanghai.app.tcloudbase.com/submitResponse";
 
 const screens = [
   {
@@ -76,7 +76,7 @@ const screens = [
       ["male", "Male", "男性"],
       ["female", "Female", "女性"],
       ["non_binary", "Non-binary", "非二元性别"],
-      ["prefer_not", "Prefer not to tell", "不愿透露"],
+      ["prefer_not_to_tell", "Prefer not to tell", "不愿透露"],
     ],
   },
   {
@@ -346,7 +346,7 @@ nextButton.addEventListener("click", handleNext);
 function render() {
   const current = screens[state.index];
   stepLabel.textContent = current.topLabel || "Questionnaire";
-  progressLabel.textContent = `${Math.min(state.index + 1, screens.length)}/${screens.length}`;
+  progressLabel.textContent = getProgressLabel(current);
   validationMessage.textContent = "";
   nextButton.hidden = current.type === "submit";
   nextButton.disabled = !isComplete(current);
@@ -483,6 +483,11 @@ function updateChoice(screen) {
 }
 
 function renderLikert(screen) {
+  if (isMobileLayout()) {
+    renderLikertMobile(screen);
+    return;
+  }
+
   const answer = getAnswer(screen.id) || { values: {}, explanation: "" };
   screenEl.innerHTML = `
     <div class="question-title">
@@ -527,6 +532,77 @@ function renderLikert(screen) {
             .join("")}
         </tbody>
       </table>
+    </div>
+    ${
+      screen.explain
+        ? `<div class="explain-box">
+            <label>${screen.explain[0]}<span class="cn">${screen.explain[1]}</span></label>
+            <textarea id="explanation" placeholder="Type your explanation here / 请在此输入解释">${answer.explanation || ""}</textarea>
+          </div>`
+        : ""
+    }
+  `;
+
+  screenEl.querySelectorAll(".scale button").forEach((button) => {
+    button.addEventListener("click", () => {
+      const code = button.closest(".scale").dataset.code;
+      if (!state.answers[screen.id]) state.answers[screen.id] = { values: {}, explanation: "" };
+      state.answers[screen.id].values[code] = Number(button.dataset.score);
+      button.parentElement.querySelectorAll("button").forEach((sibling) => sibling.classList.remove("selected"));
+      button.classList.add("selected");
+      nextButton.disabled = !isComplete(screen);
+    });
+  });
+
+  const explanation = screenEl.querySelector("#explanation");
+  if (explanation) {
+    explanation.addEventListener("input", () => {
+      if (!state.answers[screen.id]) state.answers[screen.id] = { values: {}, explanation: "" };
+      state.answers[screen.id].explanation = explanation.value.trim();
+      nextButton.disabled = !isComplete(screen);
+    });
+  }
+}
+
+function renderLikertMobile(screen) {
+  const answer = getAnswer(screen.id) || { values: {}, explanation: "" };
+
+  screenEl.innerHTML = `
+    <div class="question-title mobile-likert-title">
+      <span class="en">${screen.title}</span>
+      <span class="cn">${screen.titleCn}</span>
+      <span class="item-progress">${screen.items.length} items / ${screen.items.length} 题</span>
+    </div>
+    <div class="mobile-likert-list">
+      ${screen.items
+        .map(
+          ([code, en, cn]) => `
+            <section class="mobile-likert-card">
+              <p class="mobile-item-code">${code}</p>
+              <div class="prompt">
+                <span class="en">${en}</span>
+                <span class="cn">${cn}</span>
+              </div>
+              <div class="scale mobile-scale" data-code="${code}">
+                <div class="scale-row">
+                  ${formatEndpointLabel(screen.leftLabel, "scale-end left")}
+                  <div class="scale-buttons">
+                    ${[1, 2, 3, 4, 5]
+                      .map(
+                        (score) =>
+                          `<button type="button" data-score="${score}" class="${answer.values[code] === score ? "selected" : ""}">
+                            <span class="score-number">${score}</span>
+                          </button>`
+                      )
+                      .join("")}
+                  </div>
+                  ${formatEndpointLabel(screen.rightLabel, "scale-end right")}
+                </div>
+              </div>
+            </section>
+          `
+        )
+        .join("")}
     </div>
     ${
       screen.explain
@@ -657,6 +733,15 @@ function isComplete(screen) {
   }
   if (screen.type === "text") return Boolean(answer?.value?.trim());
   return false;
+}
+
+function isMobileLayout() {
+  return window.matchMedia("(max-width: 760px)").matches;
+}
+
+function getProgressLabel(screen) {
+  const base = `${Math.min(state.index + 1, screens.length)}/${screens.length}`;
+  return base;
 }
 
 function getEndTrigger(screen) {
