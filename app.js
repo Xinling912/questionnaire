@@ -7,6 +7,7 @@ const END_TRIGGERS = new Set([
 ]);
 
 const SUBMISSION_ENDPOINT = "https://questionnaire-d7gkuzy61a43c1a64-1445197007.ap-shanghai.app.tcloudbase.com/submitResponse";
+const LOCAL_PROGRESS_KEY = "questionnaireProgress";
 
 const screens = [
   {
@@ -328,12 +329,18 @@ const screens = [
 
 const state = {
   index: 0,
+  respondentId: getOrCreateRespondentId(),
   answers: {},
+  completedScreens: [],
   endedEarly: false,
   endReason: "",
   submissionStatus: "idle",
   submissionError: "",
+  saveStatus: "idle",
+  saveError: "",
 };
+
+restoreLocalProgress();
 
 const screenEl = document.querySelector("#screen");
 const nextButton = document.querySelector("#nextButton");
@@ -350,7 +357,11 @@ function render() {
   validationMessage.textContent = "";
   nextButton.hidden = current.type === "submit";
   nextButton.disabled = !isComplete(current);
-  nextButton.textContent = current.type === "consent" ? "Agree and Continue" : "Continue";
+  if (state.saveStatus === "saving") {
+    nextButton.textContent = "Saving...";
+  } else {
+    nextButton.textContent = current.type === "consent" ? "Agree and Continue" : "Continue";
+  }
 
   if (current.type === "welcome") renderWelcome(current);
   if (current.type === "consent") renderConsent(current);
@@ -358,6 +369,21 @@ function render() {
   if (current.type === "likert") renderLikert(current);
   if (current.type === "text") renderText(current);
   if (current.type === "submit") renderSubmit(current);
+}
+
+function restoreLocalProgress() {
+  const saved = readLocalProgress();
+  if (!saved || saved.respondentId !== state.respondentId) return;
+
+  state.answers = saved.answers || {};
+  state.completedScreens = saved.completedScreens || [];
+  state.endedEarly = saved.endedEarly === true;
+  state.endReason = saved.endReason || "";
+
+  const nextIndex = Number.isInteger(saved.nextIndex) ? saved.nextIndex : 0;
+  if (nextIndex > 0 && nextIndex < screens.length) {
+    state.index = nextIndex;
+  }
 }
 
 function renderWelcome(screen) {
@@ -407,6 +433,7 @@ function renderConsent(screen) {
         (item) => item.value
       );
       state.answers[screen.id] = { value };
+      saveLocalProgress();
       nextButton.disabled = !isComplete(screen);
     });
   });
@@ -479,6 +506,7 @@ function updateChoice(screen) {
   });
 
   state.answers[screen.id] = { value: selected, other };
+  saveLocalProgress();
   nextButton.disabled = !isComplete(screen);
 }
 
@@ -548,6 +576,7 @@ function renderLikert(screen) {
       const code = button.closest(".scale").dataset.code;
       if (!state.answers[screen.id]) state.answers[screen.id] = { values: {}, explanation: "" };
       state.answers[screen.id].values[code] = Number(button.dataset.score);
+      saveLocalProgress();
       button.parentElement.querySelectorAll("button").forEach((sibling) => sibling.classList.remove("selected"));
       button.classList.add("selected");
       nextButton.disabled = !isComplete(screen);
@@ -559,6 +588,7 @@ function renderLikert(screen) {
     explanation.addEventListener("input", () => {
       if (!state.answers[screen.id]) state.answers[screen.id] = { values: {}, explanation: "" };
       state.answers[screen.id].explanation = explanation.value.trim();
+      saveLocalProgress();
       nextButton.disabled = !isComplete(screen);
     });
   }
@@ -619,6 +649,7 @@ function renderLikertMobile(screen) {
       const code = button.closest(".scale").dataset.code;
       if (!state.answers[screen.id]) state.answers[screen.id] = { values: {}, explanation: "" };
       state.answers[screen.id].values[code] = Number(button.dataset.score);
+      saveLocalProgress();
       button.parentElement.querySelectorAll("button").forEach((sibling) => sibling.classList.remove("selected"));
       button.classList.add("selected");
       nextButton.disabled = !isComplete(screen);
@@ -630,6 +661,7 @@ function renderLikertMobile(screen) {
     explanation.addEventListener("input", () => {
       if (!state.answers[screen.id]) state.answers[screen.id] = { values: {}, explanation: "" };
       state.answers[screen.id].explanation = explanation.value.trim();
+      saveLocalProgress();
       nextButton.disabled = !isComplete(screen);
     });
   }
@@ -649,6 +681,7 @@ function renderText(screen) {
   `;
   screenEl.querySelector("#textAnswer").addEventListener("input", (event) => {
     state.answers[screen.id] = { value: event.target.value.trim() };
+    saveLocalProgress();
     nextButton.disabled = !isComplete(screen);
   });
 }
@@ -656,24 +689,6 @@ function renderText(screen) {
 function renderSubmit() {
   const payload = buildSubmissionPayload();
   localStorage.setItem("questionnaireResponses", JSON.stringify(payload));
-  if (state.submissionStatus === "idle") {
-    if (!SUBMISSION_ENDPOINT) {
-      state.submissionStatus = "not_configured";
-    } else {
-      state.submissionStatus = "pending";
-      submitResponses(payload)
-        .then(() => {
-          state.submissionStatus = "success";
-          render();
-        })
-        .catch((error) => {
-          state.submissionStatus = "error";
-          state.submissionError = error.message || "Submission failed";
-          render();
-        });
-    }
-  }
-
   const early = state.endedEarly
     ? `<p><strong>Questionnaire ended early.</strong><br>结束原因：${state.endReason}</p>`
     : "<p><strong>All pages are complete.</strong><br>所有页面均已完成。</p>";
@@ -689,7 +704,7 @@ function renderSubmit() {
   `;
 }
 
-function handleNext() {
+async function handleNext() {
   const current = screens[state.index];
 
   if (!isComplete(current)) {
@@ -701,12 +716,28 @@ function handleNext() {
   if (trigger) {
     state.endedEarly = true;
     state.endReason = trigger;
-    state.index = screens.findIndex((screen) => screen.id === "submit");
+    const submitIndex = screens.findIndex((screen) => screen.id === "submit");
+    saveLocalProgress(submitIndex);
+    const saved = await saveProgress(current.id, true);
+    if (!saved) {
+      render();
+      validationMessage.textContent = "Save failed. Please check your connection and try again. / 保存失败，请检查网络后重试。";
+      return;
+    }
+    state.index = submitIndex;
     render();
     return;
   }
 
+  saveLocalProgress(state.index + 1);
+  const saved = await saveProgress(current.id, current.id === "C5");
+  if (!saved) {
+    render();
+    validationMessage.textContent = "Save failed. Please check your connection and try again. / 保存失败，请检查网络后重试。";
+    return;
+  }
   state.index += 1;
+  saveLocalProgress(state.index);
   render();
 }
 
@@ -752,11 +783,70 @@ function getEndTrigger(screen) {
 
 function buildSubmissionPayload() {
   return {
+    respondentId: state.respondentId,
     submittedAt: new Date().toISOString(),
     endedEarly: state.endedEarly,
     endReason: state.endReason,
+    currentScreenId: screens[state.index]?.id || "",
+    completedScreens: state.completedScreens,
     answers: state.answers,
   };
+}
+
+async function saveProgress(screenId, isFinal = false) {
+  rememberCompletedScreen(screenId);
+  const payload = {
+    ...buildSubmissionPayload(),
+    lastCompletedScreenId: screenId,
+    isFinal,
+  };
+  localStorage.setItem("questionnaireResponses", JSON.stringify(payload));
+  saveLocalProgress();
+
+  if (!SUBMISSION_ENDPOINT) return true;
+
+  state.saveStatus = "saving";
+  state.saveError = "";
+  nextButton.disabled = true;
+  nextButton.textContent = "Saving...";
+
+  try {
+    await submitResponses(payload);
+    state.saveStatus = "saved";
+    return true;
+  } catch (error) {
+    state.saveStatus = "error";
+    state.saveError = error.message || "Save failed";
+    return false;
+  }
+}
+
+function saveLocalProgress(nextIndex = state.index) {
+  const progress = {
+    respondentId: state.respondentId,
+    nextIndex,
+    answers: state.answers,
+    completedScreens: state.completedScreens,
+    endedEarly: state.endedEarly,
+    endReason: state.endReason,
+    savedAt: new Date().toISOString(),
+  };
+  localStorage.setItem(LOCAL_PROGRESS_KEY, JSON.stringify(progress));
+}
+
+function readLocalProgress() {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_PROGRESS_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function rememberCompletedScreen(screenId) {
+  if (!screenId || screenId === "welcome" || screenId === "submit") return;
+  if (!state.completedScreens.includes(screenId)) {
+    state.completedScreens.push(screenId);
+  }
 }
 
 function submitResponses(payload) {
@@ -771,19 +861,14 @@ function submitResponses(payload) {
 }
 
 function getSubmissionStatusMessage() {
-  if (state.submissionStatus === "pending") {
-    return `
-      <p><strong>Submitting response...</strong><br>正在提交问卷数据，请不要关闭页面。</p>
-    `;
-  }
-  if (state.submissionStatus === "success") {
+  if (state.saveStatus === "saved") {
     return `
       <p><strong>Response submitted.</strong><br>问卷数据已提交。</p>
     `;
   }
-  if (state.submissionStatus === "error") {
+  if (state.saveStatus === "error") {
     return `
-      <p><strong>Response could not be submitted.</strong><br>问卷数据提交失败：${escapeHtml(state.submissionError)}</p>
+      <p><strong>Response could not be submitted.</strong><br>问卷数据提交失败：${escapeHtml(state.saveError)}</p>
       <p>Please contact the researcher. / 请联系研究人员。</p>
     `;
   }
@@ -792,6 +877,18 @@ function getSubmissionStatusMessage() {
     <p>The storage backend is not connected yet. After the Google Apps Script URL is added, this page will submit responses automatically.</p>
     <p>当前还没有接入数据保存后端。填入 Google Apps Script URL 后，本页面会自动提交问卷数据。</p>
   `;
+}
+
+function getOrCreateRespondentId() {
+  const key = "questionnaireRespondentId";
+  const existing = localStorage.getItem(key);
+  if (existing) return existing;
+
+  const generated =
+    window.crypto?.randomUUID?.() ||
+    `respondent-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  localStorage.setItem(key, generated);
+  return generated;
 }
 
 function escapeAttr(value) {
