@@ -849,15 +849,27 @@ function rememberCompletedScreen(screenId) {
   }
 }
 
-function submitResponses(payload) {
-  return fetch(SUBMISSION_ENDPOINT, {
+async function submitResponses(payload) {
+  const response = await fetch(SUBMISSION_ENDPOINT, {
     method: "POST",
-    mode: "no-cors",
     headers: {
       "Content-Type": "text/plain;charset=utf-8",
     },
     body: JSON.stringify(payload),
   });
+
+  let result = {};
+  try {
+    result = await response.json();
+  } catch {
+    result = {};
+  }
+
+  if (!response.ok || result.ok === false) {
+    throw new Error(result.error || `Save failed with status ${response.status}`);
+  }
+
+  return result;
 }
 
 function getSubmissionStatusMessage() {
@@ -873,9 +885,7 @@ function getSubmissionStatusMessage() {
     `;
   }
   return `
-    <p><strong>Response completed.</strong><br>问卷已完成。</p>
-    <p>The storage backend is not connected yet. After the Google Apps Script URL is added, this page will submit responses automatically.</p>
-    <p>当前还没有接入数据保存后端。填入 Google Apps Script URL 后，本页面会自动提交问卷数据。</p>
+    <p><strong>Response submitted.</strong><br>问卷数据已提交。</p>
   `;
 }
 
