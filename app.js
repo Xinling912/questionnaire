@@ -6,6 +6,9 @@ const END_TRIGGERS = new Set([
   "A9_never",
 ]);
 
+const SUBMISSION_ENDPOINT = "https://questionnaire-d7gkuzy61a43c1a64-1445197007.ap-shanghai.app.tcloudbase.com/submitResponse";
+const LOCAL_PROGRESS_KEY = "questionnaireProgress";
+
 const screens = [
   {
     id: "welcome",
@@ -326,16 +329,18 @@ const screens = [
 
 const state = {
   index: 0,
+  respondentId: getOrCreateRespondentId(),
   answers: {},
   completedScreens: [],
   endedEarly: false,
   endReason: "",
   submissionStatus: "idle",
   submissionError: "",
-  hasDownloaded: false,
   saveStatus: "idle",
   saveError: "",
 };
+
+restoreLocalProgress();
 
 const screenEl = document.querySelector("#screen");
 const nextButton = document.querySelector("#nextButton");
@@ -364,6 +369,21 @@ function render() {
   if (current.type === "likert") renderLikert(current);
   if (current.type === "text") renderText(current);
   if (current.type === "submit") renderSubmit(current);
+}
+
+function restoreLocalProgress() {
+  const saved = readLocalProgress();
+  if (!saved || saved.respondentId !== state.respondentId) return;
+
+  state.answers = saved.answers || {};
+  state.completedScreens = saved.completedScreens || [];
+  state.endedEarly = saved.endedEarly === true;
+  state.endReason = saved.endReason || "";
+
+  const nextIndex = Number.isInteger(saved.nextIndex) ? saved.nextIndex : 0;
+  if (nextIndex > 0 && nextIndex < screens.length) {
+    state.index = nextIndex;
+  }
 }
 
 function renderWelcome(screen) {
@@ -668,26 +688,20 @@ function renderText(screen) {
 
 function renderSubmit() {
   const payload = buildSubmissionPayload();
+  localStorage.setItem("questionnaireResponses", JSON.stringify(payload));
   const early = state.endedEarly
     ? `<p><strong>Questionnaire ended early.</strong><br>结束原因：${state.endReason}</p>`
     : "<p><strong>All pages are complete.</strong><br>所有页面均已完成。</p>";
+  const submitStatus = getSubmissionStatusMessage();
 
   screenEl.innerHTML = `
     <p class="kicker">Submission</p>
     <h2>Thank you<span class="cn-title">感谢你的填写</span></h2>
     <div class="status">
       ${early}
-      <p><strong>Anonymous response file is ready.</strong><br>匿名答卷文件已生成。</p>
-      <p>No login, account, IP address, or browser progress record is stored by this page.<br>本页面不登录、不记录账号、不保存 IP 地址，也不保存浏览器断点进度。</p>
-      <p><button class="primary" type="button" id="downloadButton">Download response / 下载答卷</button></p>
+      ${submitStatus}
     </div>
   `;
-
-  screenEl.querySelector("#downloadButton").addEventListener("click", () => downloadResponses(payload));
-  if (!state.hasDownloaded) {
-    state.hasDownloaded = true;
-    downloadResponses(payload);
-  }
 }
 
 async function handleNext() {
@@ -703,7 +717,8 @@ async function handleNext() {
     state.endedEarly = true;
     state.endReason = trigger;
     const submitIndex = screens.findIndex((screen) => screen.id === "submit");
-    const saved = await saveProgress(current.id, true, submitIndex);
+    saveLocalProgress(submitIndex);
+    const saved = await saveProgress(current.id, true);
     if (!saved) {
       render();
       validationMessage.textContent = "Save failed. Please check your connection and try again. / 保存失败，请检查网络后重试。";
@@ -714,13 +729,15 @@ async function handleNext() {
     return;
   }
 
-  const saved = await saveProgress(current.id, current.id === "C5", state.index + 1);
+  saveLocalProgress(state.index + 1);
+  const saved = await saveProgress(current.id, current.id === "C5");
   if (!saved) {
     render();
     validationMessage.textContent = "Save failed. Please check your connection and try again. / 保存失败，请检查网络后重试。";
     return;
   }
   state.index += 1;
+  saveLocalProgress(state.index);
   render();
 }
 
@@ -766,6 +783,7 @@ function getEndTrigger(screen) {
 
 function buildSubmissionPayload() {
   return {
+    respondentId: state.respondentId,
     submittedAt: new Date().toISOString(),
     endedEarly: state.endedEarly,
     endReason: state.endReason,
@@ -775,14 +793,53 @@ function buildSubmissionPayload() {
   };
 }
 
-async function saveProgress(screenId, isFinal = false, nextIndex = state.index) {
+async function saveProgress(screenId, isFinal = false) {
   rememberCompletedScreen(screenId);
-  state.saveStatus = "idle";
-  return true;
+  const payload = {
+    ...buildSubmissionPayload(),
+    lastCompletedScreenId: screenId,
+    isFinal,
+  };
+  localStorage.setItem("questionnaireResponses", JSON.stringify(payload));
+  saveLocalProgress();
+
+  if (!SUBMISSION_ENDPOINT) return true;
+
+  state.saveStatus = "saving";
+  state.saveError = "";
+  nextButton.disabled = true;
+  nextButton.textContent = "Saving...";
+
+  try {
+    await submitResponses(payload);
+    state.saveStatus = "saved";
+    return true;
+  } catch (error) {
+    state.saveStatus = "error";
+    state.saveError = error.message || "Save failed";
+    return false;
+  }
 }
 
-function saveLocalProgress() {
-  // Intentionally empty: the anonymous version does not store browser progress.
+function saveLocalProgress(nextIndex = state.index) {
+  const progress = {
+    respondentId: state.respondentId,
+    nextIndex,
+    answers: state.answers,
+    completedScreens: state.completedScreens,
+    endedEarly: state.endedEarly,
+    endReason: state.endReason,
+    savedAt: new Date().toISOString(),
+  };
+  localStorage.setItem(LOCAL_PROGRESS_KEY, JSON.stringify(progress));
+}
+
+function readLocalProgress() {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_PROGRESS_KEY) || "null");
+  } catch {
+    return null;
+  }
 }
 
 function rememberCompletedScreen(screenId) {
@@ -792,17 +849,46 @@ function rememberCompletedScreen(screenId) {
   }
 }
 
-function downloadResponses(payload) {
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  link.href = url;
-  link.download = `anonymous-questionnaire-response-${timestamp}.json`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+function submitResponses(payload) {
+  return fetch(SUBMISSION_ENDPOINT, {
+    method: "POST",
+    mode: "no-cors",
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+function getSubmissionStatusMessage() {
+  if (state.saveStatus === "saved") {
+    return `
+      <p><strong>Response submitted.</strong><br>问卷数据已提交。</p>
+    `;
+  }
+  if (state.saveStatus === "error") {
+    return `
+      <p><strong>Response could not be submitted.</strong><br>问卷数据提交失败：${escapeHtml(state.saveError)}</p>
+      <p>Please contact the researcher. / 请联系研究人员。</p>
+    `;
+  }
+  return `
+    <p><strong>Response completed.</strong><br>问卷已完成。</p>
+    <p>The storage backend is not connected yet. After the Google Apps Script URL is added, this page will submit responses automatically.</p>
+    <p>当前还没有接入数据保存后端。填入 Google Apps Script URL 后，本页面会自动提交问卷数据。</p>
+  `;
+}
+
+function getOrCreateRespondentId() {
+  const key = "questionnaireRespondentId";
+  const existing = localStorage.getItem(key);
+  if (existing) return existing;
+
+  const generated =
+    window.crypto?.randomUUID?.() ||
+    `respondent-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  localStorage.setItem(key, generated);
+  return generated;
 }
 
 function escapeAttr(value) {
