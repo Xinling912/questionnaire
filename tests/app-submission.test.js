@@ -10,6 +10,7 @@ test("questionnaire submits to the existing CloudBase endpoint without WeChat id
   assert.equal(appSource.includes('mode: "no-cors"'), false);
   assert.match(appSource, /response\.ok/);
   assert.match(appSource, /result\.ok/);
+  assert.match(appSource, /current\.type === "welcome"/);
   assert.equal(appSource.includes("Google Apps Script URL"), false);
   assert.equal(appSource.includes("数据保存后端"), false);
   assert.equal(appSource.includes("openid"), false);

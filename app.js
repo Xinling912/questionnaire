@@ -712,6 +712,13 @@ async function handleNext() {
     return;
   }
 
+  if (current.type === "welcome") {
+    state.index += 1;
+    saveLocalProgress(state.index);
+    render();
+    return;
+  }
+
   const trigger = getEndTrigger(current);
   if (trigger) {
     state.endedEarly = true;
