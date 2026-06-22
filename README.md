@@ -6,6 +6,18 @@ This is a static frontend prototype for the questionnaire in `问卷2.1.docx`, s
 
 Open `index.html` directly in a browser, or serve this folder with any static server.
 
+## Anonymous Browser Preview
+
+This branch runs as an anonymous browser-only questionnaire. It does not log in, identify respondents, save browser progress, or submit responses to a server.
+
+Start a local static server:
+
+```bash
+npm start
+```
+
+Then open `http://127.0.0.1:8080`.
+
 ## Current Frontend Logic
 
 - Each question page must be completed before the respondent can continue.
@@ -15,7 +27,7 @@ Open `index.html` directly in a browser, or serve this folder with any static se
 - Each Likert table is shown as one page.
 - English text appears first and Chinese text starts on a new line.
 - Explanation text boxes stay on the same page as their corresponding table.
-- Current submission behavior downloads a JSON file and saves the same payload to browser `localStorage`.
+- Current submission behavior downloads an anonymous JSON file in the respondent's browser.
 
 ## Backend Collection Options
 
@@ -38,7 +50,7 @@ Other choices:
    - Best for stricter control, audit logs, and larger deployment.
    - More setup and maintenance.
 
-The frontend submission point is `downloadResponses()` in `app.js`. Replace the download behavior with `fetch("/api/responses", ...)` or a hosted endpoint once you choose the backend.
+The frontend submission point is `downloadResponses()` in `app.js`. Keep it browser-only if the study must not collect server-side identifiers such as IP addresses.
 
 ## Online Deployment Options
 

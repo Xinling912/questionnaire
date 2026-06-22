@@ -1,2 +1,4 @@
 ﻿tmp_pdf_pages/
 .repo_git/
+.env
+data/
