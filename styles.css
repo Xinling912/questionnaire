@@ -366,6 +366,52 @@ th:last-child {
   color: var(--muted);
 }
 
+.item-explanations {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.explanation-intro {
+  margin-top: 0;
+}
+
+.item-explanation {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.explanation-warning {
+  display: none;
+  margin: 8px 0 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.item-explanation.invalid textarea {
+  border-color: var(--danger);
+}
+
+.item-explanation.invalid .explanation-warning {
+  display: block;
+}
+
+.desktop-explanation-row td {
+  padding-top: 0;
+  border-top: 0;
+  background: #fff;
+}
+
+.desktop-item-explanation {
+  margin-top: 0;
+  padding: 0 0 16px;
+}
+
+.desktop-item-explanation textarea {
+  min-height: 86px;
+}
+
 textarea {
   min-height: 110px;
   resize: vertical;
@@ -475,6 +521,15 @@ textarea {
 
   .mobile-likert-card .prompt {
     margin-bottom: 22px;
+  }
+
+  .mobile-item-explanation {
+    margin-top: 16px;
+    padding: 0;
+  }
+
+  .mobile-item-explanation textarea {
+    min-height: 88px;
   }
 
   .mobile-scale,

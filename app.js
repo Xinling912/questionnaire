@@ -6,6 +6,26 @@ const END_TRIGGERS = new Set([
   "A9_never",
 ]);
 
+const INVALID_EXPLANATIONS = new Set([
+  "无",
+  "没有",
+  "没",
+  "不知道",
+  "不清楚",
+  "不了解",
+  "无理由",
+  "没理由",
+  "没什么",
+  "none",
+  "no",
+  "nothing",
+  "n/a",
+  "na",
+  "idk",
+  "dontknow",
+  "don'tknow",
+]);
+
 const SUBMISSION_ENDPOINT = "https://questionnaire-d7gkuzy61a43c1a64-1445197007.ap-shanghai.app.tcloudbase.com/submitResponse";
 const LOCAL_PROGRESS_KEY = "questionnaireProgress";
 
@@ -516,7 +536,7 @@ function renderLikert(screen) {
     return;
   }
 
-  const answer = getAnswer(screen.id) || { values: {}, explanation: "" };
+  const answer = getLikertAnswer(screen.id);
   screenEl.innerHTML = `
     <div class="question-title">
       <span class="en">${screen.title}</span>
@@ -555,26 +575,28 @@ function renderLikert(screen) {
                     </div>
                   </td>
                 </tr>
+                ${
+                  screen.explain
+                    ? `<tr class="desktop-explanation-row">
+                        <td></td>
+                        <td colspan="2">
+                          ${renderSingleItemExplanation(code, en, answer, "desktop-item-explanation")}
+                        </td>
+                      </tr>`
+                    : ""
+                }
               `
             )
             .join("")}
         </tbody>
       </table>
     </div>
-    ${
-      screen.explain
-        ? `<div class="explain-box">
-            <label>${screen.explain[0]}<span class="cn">${screen.explain[1]}</span></label>
-            <textarea id="explanation" placeholder="Type your explanation here / 请在此输入解释">${answer.explanation || ""}</textarea>
-          </div>`
-        : ""
-    }
   `;
 
   screenEl.querySelectorAll(".scale button").forEach((button) => {
     button.addEventListener("click", () => {
       const code = button.closest(".scale").dataset.code;
-      if (!state.answers[screen.id]) state.answers[screen.id] = { values: {}, explanation: "" };
+      ensureLikertAnswer(screen.id);
       state.answers[screen.id].values[code] = Number(button.dataset.score);
       saveLocalProgress();
       button.parentElement.querySelectorAll("button").forEach((sibling) => sibling.classList.remove("selected"));
@@ -583,19 +605,22 @@ function renderLikert(screen) {
     });
   });
 
-  const explanation = screenEl.querySelector("#explanation");
-  if (explanation) {
+  screenEl.querySelectorAll("[data-explanation-code]").forEach((explanation) => {
     explanation.addEventListener("input", () => {
-      if (!state.answers[screen.id]) state.answers[screen.id] = { values: {}, explanation: "" };
-      state.answers[screen.id].explanation = explanation.value.trim();
+      ensureLikertAnswer(screen.id);
+      const code = explanation.dataset.explanationCode;
+      state.answers[screen.id].explanations[code] = explanation.value.trim();
+      explanation
+        .closest(".item-explanation")
+        ?.classList.toggle("invalid", explanation.value.trim() !== "" && !isValidExplanation(explanation.value));
       saveLocalProgress();
       nextButton.disabled = !isComplete(screen);
     });
-  }
+  });
 }
 
 function renderLikertMobile(screen) {
-  const answer = getAnswer(screen.id) || { values: {}, explanation: "" };
+  const answer = getLikertAnswer(screen.id);
 
   screenEl.innerHTML = `
     <div class="question-title mobile-likert-title">
@@ -629,25 +654,22 @@ function renderLikertMobile(screen) {
                   ${formatEndpointLabel(screen.rightLabel, "scale-end right")}
                 </div>
               </div>
+              ${
+                screen.explain
+                  ? renderSingleItemExplanation(code, en, answer, "mobile-item-explanation")
+                  : ""
+              }
             </section>
           `
         )
         .join("")}
     </div>
-    ${
-      screen.explain
-        ? `<div class="explain-box">
-            <label>${screen.explain[0]}<span class="cn">${screen.explain[1]}</span></label>
-            <textarea id="explanation" placeholder="Type your explanation here / 请在此输入解释">${answer.explanation || ""}</textarea>
-          </div>`
-        : ""
-    }
-  `;
+`;
 
   screenEl.querySelectorAll(".scale button").forEach((button) => {
     button.addEventListener("click", () => {
       const code = button.closest(".scale").dataset.code;
-      if (!state.answers[screen.id]) state.answers[screen.id] = { values: {}, explanation: "" };
+      ensureLikertAnswer(screen.id);
       state.answers[screen.id].values[code] = Number(button.dataset.score);
       saveLocalProgress();
       button.parentElement.querySelectorAll("button").forEach((sibling) => sibling.classList.remove("selected"));
@@ -656,15 +678,77 @@ function renderLikertMobile(screen) {
     });
   });
 
-  const explanation = screenEl.querySelector("#explanation");
-  if (explanation) {
+  screenEl.querySelectorAll("[data-explanation-code]").forEach((explanation) => {
     explanation.addEventListener("input", () => {
-      if (!state.answers[screen.id]) state.answers[screen.id] = { values: {}, explanation: "" };
-      state.answers[screen.id].explanation = explanation.value.trim();
+      ensureLikertAnswer(screen.id);
+      const code = explanation.dataset.explanationCode;
+      state.answers[screen.id].explanations[code] = explanation.value.trim();
+      explanation
+        .closest(".item-explanation")
+        ?.classList.toggle("invalid", explanation.value.trim() !== "" && !isValidExplanation(explanation.value));
       saveLocalProgress();
       nextButton.disabled = !isComplete(screen);
     });
-  }
+  });
+}
+
+function renderItemExplanations(screen, answer) {
+  return `
+    <div class="item-explanations">
+      <div class="explain-box explanation-intro">
+        <label>
+          Please explain why you selected each rating above.
+          <span class="cn">请分别解释上表中每一道题为什么这样评分。</span>
+        </label>
+      </div>
+      ${screen.items
+        .map(([code, en]) => renderSingleItemExplanation(code, en, answer))
+        .join("")}
+    </div>
+  `;
+}
+
+function renderSingleItemExplanation(code, en, answer, extraClass = "") {
+  const value = getItemExplanation(answer, code);
+  const invalidClass = value && !isValidExplanation(value) ? " invalid" : "";
+  return `
+    <div class="explain-box item-explanation ${extraClass}${invalidClass}">
+      <textarea
+        aria-label="Explanation for this rating"
+        data-explanation-code="${code}"
+        placeholder="Please explain your rating thoughtfully. Avoid writing only 'none', 'no', or 'I do not know'. / \u8bf7\u8ba4\u771f\u8bf4\u660e\u8bc4\u5206\u7406\u7531\uff0c\u907f\u514d\u53ea\u5199\u201c\u65e0 / \u6ca1\u6709 / \u4e0d\u77e5\u9053\u201d\u3002"
+      >${escapeHtml(value)}</textarea>
+      <p class="explanation-warning">Please write a brief and specific reason for this rating. / \u8bf7\u586b\u5199\u7b80\u77ed\u4e14\u5177\u4f53\u7684\u8bc4\u5206\u7406\u7531\u3002</p>
+    </div>
+  `;
+}
+function getLikertAnswer(screenId) {
+  const answer = state.answers[screenId] || {};
+  return {
+    ...answer,
+    values: answer.values || {},
+    explanations: answer.explanations || {},
+  };
+}
+
+function ensureLikertAnswer(screenId) {
+  if (!state.answers[screenId]) state.answers[screenId] = { values: {}, explanations: {} };
+  if (!state.answers[screenId].values) state.answers[screenId].values = {};
+  if (!state.answers[screenId].explanations) state.answers[screenId].explanations = {};
+}
+
+function getItemExplanation(answer, code) {
+  return answer.explanations?.[code] || "";
+}
+
+function isValidExplanation(value) {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  const normalized = trimmed
+    .toLowerCase()
+    .replace(/[\s.,，。!！?？、/\\\-_'"]/g, "");
+  if (INVALID_EXPLANATIONS.has(normalized)) return false;
+  return normalized.length >= 2;
 }
 
 function renderText(screen) {
@@ -759,7 +843,9 @@ function isComplete(screen) {
   if (screen.type === "likert") {
     if (!answer) return false;
     const allRated = screen.items.every(([code]) => Number.isInteger(answer.values?.[code]));
-    const explanationReady = !screen.explain || Boolean(answer.explanation?.trim());
+    const explanationReady =
+      !screen.explain ||
+      screen.items.every(([code]) => isValidExplanation(answer.explanations?.[code] || ""));
     return allRated && explanationReady;
   }
   if (screen.type === "text") return Boolean(answer?.value?.trim());
@@ -874,8 +960,8 @@ function getSubmissionStatusMessage() {
   }
   return `
     <p><strong>Response completed.</strong><br>问卷已完成。</p>
-    <p>The storage backend is not connected yet. After the Google Apps Script URL is added, this page will submit responses automatically.</p>
-    <p>当前还没有接入数据保存后端。填入 Google Apps Script URL 后，本页面会自动提交问卷数据。</p>
+    <p>Your response has been saved to the research database.</p>
+    <p>问卷数据已保存到研究数据库。</p>
   `;
 }
 
